@@ -1,0 +1,58 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "client" 
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model DailyBatch {
+  id                 String   @id @default(cuid())
+  date               DateTime @default(now())
+  size               String   
+  basePricePerKg     Decimal  @db.Decimal(10, 2)
+  initialCrates      Int      
+  avgWeightPerCrate  Decimal  @default(24.0) @db.Decimal(10, 2)
+  
+  // NUEVO: Contador de cajas que se acabaron por kileado
+  consumedCrates     Int      @default(0) 
+
+  isActive           Boolean  @default(true) 
+  sales              Sale[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Agrega esto arriba o abajo de tus modelos
+enum SaleStatus {
+  ENTREGADO        // Se lo llevó al toque
+  EN_PUESTO        // "Luego lo llevo"
+}
+
+model Sale {
+  id           String      @id @default(cuid())
+  batchId      String
+  batch        DailyBatch  @relation(fields: [batchId], references: [id])
+  weightKg     Decimal     @db.Decimal(10, 3) 
+  pricePerKg   Decimal     @db.Decimal(10, 2) 
+  totalPrice   Decimal     @db.Decimal(10, 2) 
+  
+  // NUEVO: Cuánto soltó de billete realmente
+  amountPaid   Decimal     @default(0) @db.Decimal(10, 2)
+
+  isCrate      Boolean     @default(false) 
+  status       SaleStatus  @default(ENTREGADO)
+  isPaid       Boolean     @default(true) // Si amountPaid < totalPrice, esto será false
+  customerName String?    
+  createdAt    DateTime    @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime @default(now())
+}
