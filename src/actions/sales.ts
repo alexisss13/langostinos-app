@@ -135,3 +135,33 @@ export async function markCrateFinished(size: string) {
     return { success: false, message: 'Error al marcar caja' };
   }
 }
+
+// NUEVA FUNCIÓN: Obtener TODAS las ventas de una fecha específica
+export async function getSalesByDate(dateStr: string) {
+  const startOfDay = new Date(`${dateStr}T00:00:00`);
+  const endOfDay = new Date(`${dateStr}T23:59:59`);
+
+  const sales = await prisma.sale.findMany({
+    where: {
+      createdAt: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { batch: true },
+  });
+
+  return sales.map(sale => ({
+    ...sale,
+    weightKg: sale.weightKg.toNumber(),
+    pricePerKg: sale.pricePerKg.toNumber(),
+    totalPrice: sale.totalPrice.toNumber(),
+    amountPaid: sale.amountPaid.toNumber(),
+    batch: {
+        ...sale.batch,
+        basePricePerKg: sale.batch.basePricePerKg.toNumber(),
+        avgWeightPerCrate: sale.batch.avgWeightPerCrate.toNumber(),
+    }
+  }));
+}

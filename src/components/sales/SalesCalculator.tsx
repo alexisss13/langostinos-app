@@ -6,21 +6,23 @@ import { Button } from '@/components/ui/button';
 import { 
   Delete, CheckCircle, RefreshCcw, ArrowLeft, Loader2, 
   Package, UserCheck, Trash2, BoxSelect, Pencil, 
-  CreditCard, Banknote, TrendingDown, Ship 
+  CreditCard, Banknote, TrendingDown, Ship, History, PieChart 
 } from 'lucide-react';
 import { registerSale, updateSale, deleteSale, getRecentSales, markCrateFinished } from '@/actions/sales';
 import { getTodayBatches } from '@/actions/batches';
 import ExpensesManager from '@/components/expenses/ExpensesManager';
 import OpeningForm from '@/components/batches/OpeningForm';
+import SalesHistory from '@/components/history/SalesHistory';
+import Link from 'next/link';
 
-// Tipo actualizado con todas las propiedades requeridas
+// Tipos actualizados
 type BatchData = { 
     id: string; 
     size: string; 
     price: number; 
     stockKg: number; 
     initialCrates: number; 
-    remainingCrates: number; // Campo obligatorio
+    remainingCrates: number; 
 };
 
 type SaleRecord = {
@@ -38,7 +40,9 @@ type SaleRecord = {
 
 export default function SalesCalculator() {
   const [isLoadingApp, setIsLoadingApp] = useState(true);
-  const [currentView, setCurrentView] = useState<'loading' | 'opening' | 'sales' | 'expenses'>('loading');
+  
+  // Vistas disponibles dentro del componente principal
+  const [currentView, setCurrentView] = useState<'loading' | 'opening' | 'sales' | 'expenses' | 'history'>('loading');
 
   const [step, setStep] = useState<1 | 2>(1);
   const [batches, setBatches] = useState<BatchData[]>([]);
@@ -85,7 +89,6 @@ export default function SalesCalculator() {
   const refreshData = async () => {
     const sales = await getRecentSales();
     setRecentSales(sales as unknown as SaleRecord[]);
-    // Recargamos los lotes para actualizar el stock visual de cajas
     const updatedBatches = await getTodayBatches();
     if(updatedBatches.length > 0) setBatches(updatedBatches);
   };
@@ -109,14 +112,10 @@ export default function SalesCalculator() {
   };
 
   const handleEdit = (sale: SaleRecord) => {
-    // CORRECCIÓN: El objeto fallback ahora tiene todas las propiedades de BatchData
-    const originalBatch: BatchData = batches.find(b => b.size === sale.batch.size) || { 
-        id: '0', 
-        size: sale.batch.size, 
-        price: sale.pricePerKg, 
-        stockKg: 0, 
-        initialCrates: 0,
-        remainingCrates: 0 // <--- Agregado para cumplir con el tipo
+    setCurrentView('sales'); // Volver al dashboard si venimos de otra vista
+
+    const originalBatch = batches.find(b => b.size === sale.batch.size) || { 
+        id: '0', size: sale.batch.size, price: sale.pricePerKg, stockKg: 0, initialCrates: 0, remainingCrates: 0 
     };
     
     setSelectedBatch(originalBatch);
@@ -173,7 +172,6 @@ export default function SalesCalculator() {
 
   const handleSave = () => {
     if (!selectedBatch || total <= 0) return;
-    
     if (currentDebt > 0.1 && customerName.trim() === '') {
         alert("⚠️ Si hay deuda, escribe el nombre del cliente.");
         return;
@@ -181,7 +179,6 @@ export default function SalesCalculator() {
 
     startTransition(async () => {
       const finalStatus: 'EN_PUESTO' | 'ENTREGADO' = isPendingPickup ? 'EN_PUESTO' : 'ENTREGADO';
-
       const data = {
         id: editingSaleId || undefined,
         size: selectedBatch.size,
@@ -224,10 +221,7 @@ export default function SalesCalculator() {
     if(!confirm(`¿Se terminó caja de ${size}?`)) return;
     startTransition(async () => {
         const res = await markCrateFinished(size);
-        if(res.success) {
-            alert(`✅ Caja de ${size} vacía.`);
-            refreshData(); 
-        }
+        if(res.success) { alert(`✅ Caja de ${size} vacía.`); refreshData(); }
     });
   };
 
@@ -235,44 +229,48 @@ export default function SalesCalculator() {
     return new Date(dateString).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
-  if (isLoadingApp) {
-    return <div className="h-screen flex items-center justify-center bg-zinc-50"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
-  }
+  // --- RENDERIZADO CONDICIONAL DE VISTAS ---
 
-  if (currentView === 'opening') {
-    return <OpeningForm onSuccess={initApp} />;
-  }
+  if (isLoadingApp) return <div className="h-screen flex items-center justify-center bg-zinc-50"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
 
-  if (currentView === 'expenses') {
-    return <ExpensesManager onBack={() => setCurrentView('sales')} />;
-  }
+  if (currentView === 'opening') return <OpeningForm onSuccess={initApp} />;
+  
+  if (currentView === 'expenses') return <ExpensesManager onBack={() => setCurrentView('sales')} />;
+  
+  if (currentView === 'history') return <SalesHistory onBack={() => setCurrentView('sales')} onEdit={handleEdit} />;
 
-  // VISTA PRINCIPAL (DASHBOARD)
+  // --- VISTA DASHBOARD (VENTAS) ---
   if (step === 1) {
     return (
       <div className="flex flex-col h-screen bg-zinc-50 p-4">
-        <div className="flex justify-between items-center mb-4 gap-2">
-            <h1 className="text-xl font-bold text-zinc-800 flex-1">Ventas ⚓</h1>
+        {/* HEADER DE NAVEGACIÓN */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+            <h1 className="text-xl font-bold text-zinc-800 flex-1 whitespace-nowrap">Ventas ⚓</h1>
             
-            <Button 
-                variant="outline" 
-                size="sm" 
-                className="bg-blue-50 text-blue-700 border-blue-200"
-                onClick={() => setCurrentView('opening')} 
-            >
+            {/* Botón Ingreso */}
+            <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 shrink-0" onClick={() => setCurrentView('opening')}>
                 <Ship className="mr-1 h-4 w-4" /> Ingreso
             </Button>
 
-            <Button 
-                variant="outline" 
-                size="sm" 
-                className="bg-red-50 text-red-600 border-red-200"
-                onClick={() => setCurrentView('expenses')}
-            >
+            {/* Botón Gastos */}
+            <Button variant="outline" size="sm" className="bg-red-50 text-red-600 border-red-200 shrink-0" onClick={() => setCurrentView('expenses')}>
                 <TrendingDown className="mr-1 h-4 w-4" /> Gastos
             </Button>
+
+            {/* Botón Historial */}
+            <Button variant="outline" size="sm" className="bg-zinc-100 text-zinc-700 border-zinc-300 shrink-0" onClick={() => setCurrentView('history')}>
+                <History className="mr-1 h-4 w-4" /> Historial
+            </Button>
+
+            {/* Botón Reportes (Link a página externa) */}
+            <Link href="/reportes">
+                <Button variant="outline" size="sm" className="bg-purple-50 text-purple-700 border-purple-200 shrink-0">
+                    <PieChart className="mr-1 h-4 w-4" /> Reportes
+                </Button>
+            </Link>
         </div>
         
+        {/* GRID DE BOTONES DE PRODUCTO */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           {batches.map((batch) => (
             <div key={batch.id} className="relative group">
@@ -283,6 +281,8 @@ export default function SalesCalculator() {
                         Quedan: {batch.remainingCrates} Cajas
                     </span>
                 </Button>
+                
+                {/* Botón Caja Terminada */}
                 <Button size="sm" variant="destructive" className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-md p-0" onClick={(e) => handleFinishCrate(e, batch.size)}>
                     <BoxSelect size={14} />
                 </Button>
@@ -290,6 +290,7 @@ export default function SalesCalculator() {
           ))}
         </div>
 
+        {/* LISTA DE ÚLTIMAS VENTAS */}
         <div className="flex-1 overflow-auto pb-4">
             <h3 className="text-sm font-bold text-zinc-500 mb-2 uppercase tracking-wider">Últimos Movimientos</h3>
             <div className="space-y-2">
@@ -303,46 +304,33 @@ export default function SalesCalculator() {
                             <div className="text-sm text-zinc-600">
                                 {Number(sale.weightKg).toFixed(2)}kg x S/{Number(sale.pricePerKg)} = <span className="font-bold">S/{Number(sale.totalPrice).toFixed(2)}</span>
                             </div>
-                            
                             <div className="flex flex-wrap gap-2 mt-1">
                                 {sale.isPaid ? (
-                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                        <Banknote size={12} /> Pagado
-                                    </span>
+                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><Banknote size={12} /> Pagado</span>
                                 ) : (
-                                    <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                        <CreditCard size={12} /> 
-                                        {sale.amountPaid > 0 ? `A cta: S/${sale.amountPaid}` : 'Fiado'} 
-                                        {sale.customerName ? ` (${sale.customerName})` : ''}
-                                    </span>
+                                    <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><CreditCard size={12} /> {sale.amountPaid > 0 ? `A cta: ${sale.amountPaid}` : 'Fiado'} {sale.customerName ? ` (${sale.customerName})` : ''}</span>
                                 )}
-                                
                                 {sale.status === 'EN_PUESTO' ? (
-                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                        <Package size={12} /> En Puesto
-                                    </span>
+                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><Package size={12} /> En Puesto</span>
                                 ) : (
-                                    <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                        <CheckCircle size={12} /> Entregado
-                                    </span>
+                                    <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><CheckCircle size={12} /> Entregado</span>
                                 )}
                             </div>
                         </div>
-
                         <div className="flex flex-col gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleEdit(sale)}><Pencil size={18} /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(sale.id)}><Trash2 size={18} /></Button>
                         </div>
                     </div>
                 ))}
-                {recentSales.length === 0 && <div className="text-center text-zinc-400 py-4 text-sm">No hay ventas registradas aún.</div>}
+                {recentSales.length === 0 && <div className="text-center text-zinc-400 py-4 text-sm">No hay ventas recientes.</div>}
             </div>
         </div>
       </div>
     );
   }
 
-  // VISTA CALCULADORA
+  // --- VISTA CALCULADORA (STEP 2) ---
   return (
     <div className={`p-4 flex flex-col h-screen max-h-screen ${editingSaleId ? 'bg-orange-50' : 'bg-zinc-50'}`}>
       <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-lg border border-zinc-200 shadow-sm">
