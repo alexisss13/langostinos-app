@@ -2,40 +2,41 @@
 
 import { prisma } from '@/lib/prisma';
 
-// Función para obtener las estadísticas de una fecha
 export async function getDailyStats(dateStr: string) {
-  // Configurar rango de fecha (Inicio y Fin del día en hora local aprox)
   const startOfDay = new Date(`${dateStr}T00:00:00`);
   const endOfDay = new Date(`${dateStr}T23:59:59`);
 
   try {
-    // 1. Obtener VENTAS del día
+    // 1. Datos de Ventas
     const sales = await prisma.sale.findMany({
-      where: {
-        createdAt: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
+      where: { createdAt: { gte: startOfDay, lte: endOfDay } },
       include: { batch: true }
     });
 
-    // 2. Obtener GASTOS del día
+    // 2. Datos de Gastos
     const expenses = await prisma.expense.findMany({
-      where: {
-        date: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
+      where: { date: { gte: startOfDay, lte: endOfDay } },
     });
 
-    // 3. Calcular Totales
-    let totalVendido = 0;      // Dinero teórico total
-    let totalCobrado = 0;      // Dinero real en mano (incluye pagos parciales)
-    let totalFiado = 0;        // Deuda generada hoy
-    let totalKilos = 0;        // Kilos movidos
-    let totalGastos = 0;       // Salidas
+    // 3. Datos de Lotes (Para stock y cajas consumidas)
+    const batches = await prisma.dailyBatch.findMany({
+        where: { date: { gte: startOfDay, lte: endOfDay } }
+    });
+
+    // Mapa auxiliar para contar cajas
+    const stockMap: Record<string, { remaining: number, consumed: number }> = {};
+    
+    batches.forEach(b => {
+        if (!stockMap[b.size]) stockMap[b.size] = { remaining: 0, consumed: 0 };
+        stockMap[b.size].remaining += (b.initialCrates - b.consumedCrates);
+        stockMap[b.size].consumed += b.consumedCrates; // <--- AQUÍ SUMAMOS LAS CAJAS VACÍAS
+    });
+
+    let totalVendido = 0;
+    let totalCobrado = 0;
+    let totalFiado = 0;
+    let totalKilos = 0;
+    let totalGastos = 0;
 
     sales.forEach(sale => {
       totalVendido += sale.totalPrice.toNumber();
@@ -49,7 +50,6 @@ export async function getDailyStats(dateStr: string) {
       totalGastos += exp.amount.toNumber();
     });
 
-    // 4. Filtrar Deudores (Quienes no han pagado completo)
     const debtors = sales
       .filter(s => !s.isPaid)
       .map(s => ({
@@ -60,30 +60,31 @@ export async function getDailyStats(dateStr: string) {
         time: s.createdAt
       }));
 
-    // 5. Agrupar Ventas por Producto (Para el gráfico de pastel mental)
-    const byProduct: Record<string, { kg: number, soles: number }> = {};
+    // Agrupación por producto con DATOS REALES
+    const byProduct: Record<string, { kg: number, soles: number, remainingCrates: number, consumedCrates: number }> = {};
+    
     sales.forEach(s => {
         const size = s.batch.size;
-        if (!byProduct[size]) byProduct[size] = { kg: 0, soles: 0 };
+        if (!byProduct[size]) {
+            byProduct[size] = { 
+                kg: 0, 
+                soles: 0, 
+                remainingCrates: stockMap[size]?.remaining || 0,
+                consumedCrates: stockMap[size]?.consumed || 0 // <--- Pasamos el dato al frontend
+            };
+        }
         byProduct[size].kg += s.weightKg.toNumber();
         byProduct[size].soles += s.totalPrice.toNumber();
     });
 
     return {
-      summary: {
-        totalVendido,
-        totalCobrado,
-        totalFiado,
-        totalKilos,
-        totalGastos,
-        neto: totalCobrado - totalGastos, // Lo que te queda en el bolsillo hoy
-      },
+      summary: { totalVendido, totalCobrado, totalFiado, totalKilos, totalGastos, neto: totalCobrado - totalGastos },
       debtors,
       byProduct
     };
 
   } catch (error) {
-    console.error("Error en reporte:", error);
+    console.error(error);
     return null;
   }
 }

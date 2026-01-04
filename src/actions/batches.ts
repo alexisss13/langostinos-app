@@ -71,3 +71,50 @@ export async function openDay(data: { size: string, price: number, crates: numbe
     return { success: false };
   }
 }
+
+// ACTUALIZAR PRECIO O STOCK INICIAL
+export async function updateBatch(id: string, price: number, initialCrates: number) {
+  try {
+    await prisma.dailyBatch.update({
+      where: { id },
+      data: {
+        basePricePerKg: price,
+        initialCrates: initialCrates
+      }
+    });
+    revalidatePath('/');
+    return { success: true, message: 'Lote actualizado' };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: 'Error al actualizar' };
+  }
+}
+
+// ELIMINAR LOTE (O DESACTIVAR SI YA TIENE VENTAS)
+export async function deleteBatch(id: string) {
+  try {
+    // 1. Verificamos si ya tiene ventas asociadas
+    const batch = await prisma.dailyBatch.findUnique({
+        where: { id },
+        include: { _count: { select: { sales: true } } }
+    });
+
+    if (batch && batch._count.sales > 0) {
+        // Si ya vendiste de esta caja, NO la borramos, solo la ocultamos (isActive=false)
+        // para no romper el historial de reportes.
+        await prisma.dailyBatch.update({
+            where: { id },
+            data: { isActive: false }
+        });
+    } else {
+        // Si está virgen (0 ventas), la borramos de la base de datos
+        await prisma.dailyBatch.delete({ where: { id } });
+    }
+    
+    revalidatePath('/');
+    return { success: true, message: 'Lote eliminado' };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: 'Error al eliminar' };
+  }
+}
