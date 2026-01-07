@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Calendar, Pencil, Trash2, Banknote, CreditCard, Package, CheckCircle, Search } from 'lucide-react';
+import { ArrowLeft, Calendar, Pencil, Trash2, Banknote, CreditCard, Package, CheckCircle, Search, Filter } from 'lucide-react';
 import { getSalesByDate, deleteSale } from '@/actions/sales';
 
-// Reutilizamos el tipo (o lo importamos si estuviera en un archivo de types)
 type SaleRecord = {
     id: string;
     weightKg: number;
@@ -21,11 +20,13 @@ type SaleRecord = {
 };
 
 export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, onEdit: (sale: SaleRecord) => void }) {
-  // Fecha hoy formato YYYY-MM-DD local
   const today = new Date().toLocaleDateString('en-CA');
   const [date, setDate] = useState(today);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Estado para el filtro de producto
+  const [selectedProduct, setSelectedProduct] = useState<string>('TODOS');
 
   useEffect(() => {
     loadSales();
@@ -36,6 +37,7 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
     try {
         const data = await getSalesByDate(date);
         setSales(data as unknown as SaleRecord[]);
+        setSelectedProduct('TODOS'); // Resetear filtro al cambiar fecha
     } catch (error) {
         console.error(error);
     } finally {
@@ -53,6 +55,22 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
     return new Date(d).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  // 1. OBTENER LISTA ÚNICA DE PRODUCTOS VENDIDOS HOY
+  const productTypes = useMemo(() => {
+    const types = new Set(sales.map(s => s.batch.size));
+    return Array.from(types).sort();
+  }, [sales]);
+
+  // 2. FILTRAR VENTAS SEGÚN SELECCIÓN
+  const filteredSales = useMemo(() => {
+    if (selectedProduct === 'TODOS') return sales;
+    return sales.filter(s => s.batch.size === selectedProduct);
+  }, [sales, selectedProduct]);
+
+  // 3. CALCULAR TOTAL DEL FILTRO ACTUAL (Para que sepas cuánto suma lo que ves)
+  const totalFiltered = filteredSales.reduce((acc, curr) => acc + curr.totalPrice, 0);
+  const weightFiltered = filteredSales.reduce((acc, curr) => acc + curr.weightKg, 0);
+
   return (
     <div className="flex flex-col h-screen bg-zinc-100 p-4">
       {/* Header */}
@@ -65,28 +83,58 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
         </div>
       </div>
 
-      {/* Filtro Fecha */}
-      <Card className="p-3 mb-4 flex items-center gap-3 bg-white shadow-sm border-zinc-200">
-        <Calendar className="text-zinc-400" />
-        <input 
-            type="date" 
-            value={date} 
-            onChange={(e) => setDate(e.target.value)}
-            className="flex-1 bg-transparent text-lg font-bold text-zinc-700 outline-none"
-        />
-        <Button size="icon" variant="ghost" onClick={loadSales}>
-            <Search size={20} />
-        </Button>
+      {/* BARRA DE FILTROS */}
+      <Card className="p-3 mb-4 space-y-3 bg-white shadow-sm border-zinc-200">
+        {/* Fila 1: Fecha y Botón Buscar */}
+        <div className="flex items-center gap-3">
+            <Calendar className="text-zinc-400" />
+            <input 
+                type="date" 
+                value={date} 
+                onChange={(e) => setDate(e.target.value)}
+                className="flex-1 bg-transparent text-lg font-bold text-zinc-700 outline-none"
+            />
+            <Button size="icon" variant="ghost" onClick={loadSales}>
+                <Search size={20} />
+            </Button>
+        </div>
+
+        {/* Fila 2: Filtro de Producto (Select) */}
+        {sales.length > 0 && (
+            <div className="flex items-center gap-3 border-t pt-2 mt-2">
+                <Filter className="text-zinc-400" size={20} />
+                <select 
+                    value={selectedProduct}
+                    onChange={(e) => setSelectedProduct(e.target.value)}
+                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-700 outline-none py-1"
+                >
+                    <option value="TODOS">Todos los productos ({sales.length})</option>
+                    {productTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                    ))}
+                </select>
+            </div>
+        )}
       </Card>
 
-      {/* Lista */}
+      {/* RESUMEN RÁPIDO DEL FILTRO */}
+      {sales.length > 0 && (
+          <div className="flex justify-between px-2 mb-2 text-xs font-bold text-zinc-500 uppercase">
+              <span>{filteredSales.length} ventas</span>
+              <span>Total: S/ {totalFiltered.toFixed(2)} ({weightFiltered.toFixed(2)} kg)</span>
+          </div>
+      )}
+
+      {/* LISTA FILTRADA */}
       <div className="flex-1 overflow-auto space-y-2 pb-4">
         {loading ? (
             <div className="text-center py-10 text-zinc-400">Cargando...</div>
-        ) : sales.length === 0 ? (
-            <div className="text-center py-10 text-zinc-400">No hay ventas en esta fecha.</div>
+        ) : filteredSales.length === 0 ? (
+            <div className="text-center py-10 text-zinc-400">
+                {sales.length === 0 ? "No hay ventas en esta fecha." : "No hay ventas de este producto."}
+            </div>
         ) : (
-            sales.map((sale) => (
+            filteredSales.map((sale) => (
                 <div key={sale.id} className={`p-3 rounded-lg border flex justify-between items-center shadow-sm bg-white ${sale.isPaid ? 'border-zinc-200' : 'border-red-200'}`}>
                     <div className="flex-1">
                         <div className="flex justify-between items-start pr-2">

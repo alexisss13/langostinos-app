@@ -116,23 +116,42 @@ export async function getRecentSales() {
   }));
 }
 
+// MARCAR UNA CAJA COMO TERMINADA (Consumida)
 export async function markCrateFinished(size: string) {
   try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Buscamos el lote activo de hoy
     const batch = await prisma.dailyBatch.findFirst({
-      where: { size: size, isActive: true },
-      orderBy: { createdAt: 'desc' }
+      where: {
+        date: { gte: today },
+        size: size,
+        isActive: true
+      }
     });
 
-    if (!batch) return { success: false, message: 'No hay lote activo' };
+    if (!batch) return { success: false, message: 'Lote no encontrado' };
 
+    // 2. VERIFICACIÓN DE SEGURIDAD (El Freno de Mano) 🛑
+    // Si las consumidas ya son iguales o mayores a las iniciales, NO hacemos nada.
+    if (batch.consumedCrates >= batch.initialCrates) {
+        return { success: false, message: 'Ya no quedan cajas por consumir' };
+    }
+
+    // 3. Si hay stock, procedemos a restar
     await prisma.dailyBatch.update({
       where: { id: batch.id },
-      data: { consumedCrates: { increment: 1 } }
+      data: {
+        consumedCrates: { increment: 1 }
+      }
     });
+
     revalidatePath('/');
-    return { success: true, message: 'Caja marcada' };
+    return { success: true };
   } catch (error) {
-    return { success: false, message: 'Error al marcar caja' };
+    console.error(error);
+    return { success: false };
   }
 }
 
