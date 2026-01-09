@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { 
   Delete, CheckCircle, RefreshCcw, ArrowLeft, Loader2, 
   Package, UserCheck, Trash2, BoxSelect, Pencil, 
-  CreditCard, Banknote, TrendingDown, Ship, History, PieChart 
+  CreditCard, Banknote, TrendingDown, Ship, History, PieChart, 
+  Store
 } from 'lucide-react';
 import { registerSale, updateSale, deleteSale, getRecentSales, markCrateFinished } from '@/actions/sales';
 import { getTodayBatches } from '@/actions/batches';
@@ -15,7 +16,6 @@ import OpeningForm from '@/components/batches/OpeningForm';
 import SalesHistory from '@/components/history/SalesHistory';
 import Link from 'next/link';
 
-// Tipos actualizados
 type BatchData = { 
     id: string; 
     size: string; 
@@ -40,14 +40,10 @@ type SaleRecord = {
 
 export default function SalesCalculator() {
   const [isLoadingApp, setIsLoadingApp] = useState(true);
-  
-  // Vistas disponibles dentro del componente principal
   const [currentView, setCurrentView] = useState<'loading' | 'opening' | 'sales' | 'expenses' | 'history'>('loading');
-
   const [step, setStep] = useState<1 | 2>(1);
   const [batches, setBatches] = useState<BatchData[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<BatchData | null>(null);
-  
   const [isPending, startTransition] = useTransition();
 
   // Estados Calculadora
@@ -58,15 +54,12 @@ export default function SalesCalculator() {
   const [paymentType, setPaymentType] = useState<'full' | 'zero' | 'partial'>('full');
   const [partialAmount, setPartialAmount] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
-  
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
   const [recentSales, setRecentSales] = useState<SaleRecord[]>([]);
 
-  // CARGA INICIAL
   const initApp = useCallback(async () => {
     try {
         const todayBatches = await getTodayBatches();
-        
         if (todayBatches.length > 0) {
             setBatches(todayBatches);
             const sales = await getRecentSales();
@@ -75,16 +68,10 @@ export default function SalesCalculator() {
         } else {
             setCurrentView('opening');
         }
-    } catch (e) {
-        console.error(e);
-    } finally {
-        setIsLoadingApp(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsLoadingApp(false); }
   }, []);
 
-  useEffect(() => {
-    initApp();
-  }, [initApp]);
+  useEffect(() => { initApp(); }, [initApp]);
 
   const refreshData = async () => {
     const sales = await getRecentSales();
@@ -93,14 +80,8 @@ export default function SalesCalculator() {
     if(updatedBatches.length > 0) setBatches(updatedBatches);
   };
 
-  const weight = inputMode === 'weight' 
-    ? parseFloat(inputValue) 
-    : parseFloat(inputValue) / (finalPrice || 1);
-    
-  const total = inputMode === 'money' 
-    ? parseFloat(inputValue) 
-    : parseFloat(inputValue) * (finalPrice || 0);
-
+  const weight = inputMode === 'weight' ? parseFloat(inputValue) : parseFloat(inputValue) / (finalPrice || 1);
+  const total = inputMode === 'money' ? parseFloat(inputValue) : parseFloat(inputValue) * (finalPrice || 0);
   const currentPaid = paymentType === 'full' ? total : (paymentType === 'zero' ? 0 : parseFloat(partialAmount) || 0);
   const currentDebt = total - currentPaid;
 
@@ -112,48 +93,34 @@ export default function SalesCalculator() {
   };
 
   const handleEdit = (sale: SaleRecord) => {
-    setCurrentView('sales'); // Volver al dashboard si venimos de otra vista
-
+    setCurrentView('sales');
     const originalBatch = batches.find(b => b.size === sale.batch.size) || { 
         id: '0', size: sale.batch.size, price: sale.pricePerKg, stockKg: 0, initialCrates: 0, remainingCrates: 0 
     };
-    
     setSelectedBatch(originalBatch);
     setFinalPrice(sale.pricePerKg);
     setInputValue(sale.weightKg.toString());
     setInputMode('weight');
     setIsPendingPickup(sale.status === 'EN_PUESTO');
-    
-    if (sale.isPaid) {
-        setPaymentType('full');
-        setPartialAmount('');
-    } else if (sale.amountPaid === 0) {
-        setPaymentType('zero');
-        setPartialAmount('');
-    } else {
-        setPaymentType('partial');
-        setPartialAmount(sale.amountPaid.toString());
-    }
-
+    if (sale.isPaid) { setPaymentType('full'); setPartialAmount(''); } 
+    else if (sale.amountPaid === 0) { setPaymentType('zero'); setPartialAmount(''); } 
+    else { setPaymentType('partial'); setPartialAmount(sale.amountPaid.toString()); }
     setCustomerName(sale.customerName || '');
     setEditingSaleId(sale.id);
     setStep(2);
   };
 
   const resetCalculator = () => {
-    setInputValue('0');
-    setIsPendingPickup(false);
-    setPaymentType('full');
-    setPartialAmount('');
-    setCustomerName('');
-    setEditingSaleId(null);
+    setInputValue('0'); setIsPendingPickup(false); setPaymentType('full'); setPartialAmount(''); setCustomerName(''); setEditingSaleId(null);
   };
 
   const handleNumPad = (num: string) => {
     setInputValue(prev => {
-      if (prev === '0' && num !== '.') return num;
       if (num === '.' && prev.includes('.')) return prev;
-      if (prev.length > 6) return prev;
+      if ((prev === '0' || prev === '0.00' || prev === '0.000') && num !== '.') {
+        return num;
+      }
+      if (prev.length > 9) return prev;
       return prev + num;
     });
   };
@@ -161,67 +128,55 @@ export default function SalesCalculator() {
   const handleClear = () => setInputValue('0');
 
   const toggleMode = () => {
-    if (inputMode === 'weight') {
-      setInputValue((weight * finalPrice).toFixed(2));
-      setInputMode('money');
-    } else {
-      setInputValue((total / finalPrice).toFixed(3));
-      setInputMode('weight');
-    }
+    if (inputMode === 'weight') { setInputValue((weight * finalPrice).toFixed(2)); setInputMode('money'); } 
+    else { setInputValue((total / finalPrice).toFixed(3)); setInputMode('weight'); }
   };
 
   const handleSave = () => {
     if (!selectedBatch || total <= 0) return;
-    if (currentDebt > 0.1 && customerName.trim() === '') {
-        alert("⚠️ Si hay deuda, escribe el nombre del cliente.");
-        return;
-    }
+    if (currentDebt > 0.1 && customerName.trim() === '') { alert("⚠️ Nombre del cliente obligatorio si hay deuda."); return; }
 
     startTransition(async () => {
       const finalStatus: 'EN_PUESTO' | 'ENTREGADO' = isPendingPickup ? 'EN_PUESTO' : 'ENTREGADO';
+
       const data = {
         id: editingSaleId || undefined,
-        size: selectedBatch.size,
-        weight: weight,
-        pricePerKg: finalPrice,
-        total: total,
+        size: selectedBatch.size, 
+        weight, 
+        pricePerKg: finalPrice, 
+        total, 
         isCrate: false,
-        status: finalStatus,
+        status: finalStatus, 
         amountPaid: currentPaid, 
-        customerName: customerName
+        customerName
       };
+      
+      // SOLUCIÓN AQUÍ: Usamos una constante con operador ternario
+      const result = editingSaleId 
+        ? await updateSale(data) 
+        : await registerSale(data);
 
-      let result;
-      if (editingSaleId) {
-        result = await updateSale(data);
-      } else {
-        result = await registerSale(data);
-      }
-
-      if (result.success) {
-        setStep(1);
-        resetCalculator();
-        refreshData();
-      } else {
-        alert("❌ Error al guardar");
+      if (result.success) { 
+        setStep(1); 
+        resetCalculator(); 
+        refreshData(); 
+      } else { 
+        alert("❌ Error al guardar"); 
       }
     });
   };
 
   const handleDelete = (id: string) => {
     if(!confirm("¿Borrar venta?")) return;
-    startTransition(async () => {
-        await deleteSale(id);
-        refreshData();
-    });
+    startTransition(async () => { await deleteSale(id); refreshData(); });
   };
 
   const handleFinishCrate = (e: React.MouseEvent, size: string) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if(!confirm(`¿Se terminó caja de ${size}?`)) return;
     startTransition(async () => {
         const res = await markCrateFinished(size);
-        if(res.success) { alert(`✅ Caja de ${size} vacía.`); refreshData(); }
+        if(res.success) { refreshData(); } else { alert(res.message); }
     });
   };
 
@@ -229,188 +184,219 @@ export default function SalesCalculator() {
     return new Date(dateString).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
-  // --- RENDERIZADO CONDICIONAL DE VISTAS ---
-
-  if (isLoadingApp) return <div className="h-screen flex items-center justify-center bg-zinc-50"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
+  if (isLoadingApp) return <div className="h-screen flex items-center justify-center bg-neutral-950"><Loader2 className="animate-spin text-blue-500 w-12 h-12"/></div>;
 
   if (currentView === 'opening') return <OpeningForm onSuccess={initApp} />;
-  
   if (currentView === 'expenses') return <ExpensesManager onBack={() => setCurrentView('sales')} />;
-  
   if (currentView === 'history') return <SalesHistory onBack={() => setCurrentView('sales')} onEdit={handleEdit} />;
 
-  // --- VISTA DASHBOARD (VENTAS) ---
+  // --- VISTA DASHBOARD (VENTAS - MODO OSCURO) ---
   if (step === 1) {
     return (
-      <div className="flex flex-col h-screen bg-zinc-50 p-4">
-        {/* HEADER DE NAVEGACIÓN */}
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-            <h1 className="text-xl font-bold text-zinc-800 flex-1 whitespace-nowrap">Ventas ⚓</h1>
-            
-            {/* Botón Ingreso */}
-            <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 shrink-0" onClick={() => setCurrentView('opening')}>
-                <Ship className="mr-1 h-4 w-4" /> Ingreso
+      <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100">
+        <div className="bg-neutral-900 border-b border-neutral-800 px-4 py-3 sticky top-0 z-10 flex justify-between items-center shadow-lg">
+            <div>
+                <h1 className="text-xl font-black text-white tracking-tight">MuelleApp ⚓</h1>
+                <p className="text-xs text-neutral-400 font-medium">Panel de Control</p>
+            </div>
+            <Button 
+                size="sm" 
+                className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30 font-bold"
+                onClick={() => setCurrentView('opening')}
+            >
+                <Ship className="mr-1.5 h-4 w-4" /> Ingreso
             </Button>
-
-            {/* Botón Gastos */}
-            <Button variant="outline" size="sm" className="bg-red-50 text-red-600 border-red-200 shrink-0" onClick={() => setCurrentView('expenses')}>
-                <TrendingDown className="mr-1 h-4 w-4" /> Gastos
-            </Button>
-
-            {/* Botón Historial */}
-            <Button variant="outline" size="sm" className="bg-zinc-100 text-zinc-700 border-zinc-300 shrink-0" onClick={() => setCurrentView('history')}>
-                <History className="mr-1 h-4 w-4" /> Historial
-            </Button>
-
-            {/* Botón Reportes (Link a página externa) */}
-            <Link href="/reportes">
-                <Button variant="outline" size="sm" className="bg-purple-50 text-purple-700 border-purple-200 shrink-0">
-                    <PieChart className="mr-1 h-4 w-4" /> Reportes
-                </Button>
-            </Link>
         </div>
         
-        {/* GRID DE BOTONES DE PRODUCTO */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {batches.map((batch) => (
-            <div key={batch.id} className="relative group">
-                <Button onClick={() => handleSelectBatch(batch)} className="w-full h-32 text-xl flex flex-col items-center justify-center space-y-2 border-2 border-zinc-200 hover:border-blue-500 hover:bg-blue-50 text-black shadow-sm rounded-xl" variant="ghost">
-                    <span className="font-bold text-2xl">{batch.size}</span>
-                    <span className="text-sm opacity-80">S/ {batch.price.toFixed(2)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-normal ${batch.remainingCrates > 0 ? 'bg-zinc-200 text-zinc-600' : 'bg-red-100 text-red-600'}`}>
-                        Quedan: {batch.remainingCrates} Cajas
-                    </span>
-                </Button>
-                
-                {/* Botón Caja Terminada */}
-                <Button size="sm" variant="destructive" className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-md p-0" onClick={(e) => handleFinishCrate(e, batch.size)}>
-                    <BoxSelect size={14} />
-                </Button>
+        <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-6">
+            {/* GRID DE PRODUCTOS (RESPONSIVE) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {batches.map((batch) => (
+                <div key={batch.id} className="relative group">
+                    <Button 
+                        onClick={() => handleSelectBatch(batch)} 
+                        className="w-full h-auto flex flex-col items-start justify-between p-4 bg-neutral-900 border border-neutral-800 hover:border-blue-500 hover:bg-neutral-800 text-left shadow-lg rounded-2xl transition-all duration-200 aspect-[4/3]" 
+                        variant="ghost"
+                    >
+                        <div className="w-full">
+                            <span className="block font-black text-xl text-white mb-1 truncate w-full">{batch.size}</span>
+                            <span className="block text-sm font-semibold text-neutral-400">S/ {batch.price.toFixed(2)} <span className="text-xs font-normal opacity-60">/kg</span></span>
+                        </div>
+                        
+                        <div className={`mt-2 text-xs font-bold px-2 py-1 rounded-md w-full text-center ${batch.remainingCrates > 0 ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-900' : 'bg-red-900/30 text-red-400 border border-red-900'}`}>
+                            {batch.remainingCrates > 0 ? `${batch.remainingCrates} Cajas` : 'Agotado'}
+                        </div>
+                    </Button>
+                    
+                    {batch.remainingCrates > 0 && (
+                        <button 
+                            className="absolute -top-2 -right-2 h-8 w-8 bg-neutral-800 border border-neutral-700 text-red-400 rounded-full shadow-md flex items-center justify-center hover:bg-red-900/50 hover:text-red-300 z-20"
+                            onClick={(e) => handleFinishCrate(e, batch.size)}
+                        >
+                            <BoxSelect size={14} strokeWidth={2.5} />
+                        </button>
+                    )}
+                </div>
+            ))}
             </div>
-          ))}
+
+            <div>
+                <h3 className="text-xs font-bold text-neutral-500 mb-3 uppercase tracking-wider px-1">Últimos Movimientos</h3>
+                <div className="space-y-3">
+                    {recentSales.map((sale) => (
+                        <div key={sale.id} className="bg-neutral-900 p-3 rounded-xl border border-neutral-800 shadow-sm flex justify-between items-center">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-bold text-neutral-200">{sale.batch.size}</span>
+                                    <span className="text-[10px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded">{formatPeruTime(sale.createdAt)}</span>
+                                </div>
+                                <div className="text-sm text-neutral-400">
+                                    <span className="font-medium text-neutral-300">{Number(sale.weightKg).toFixed(2)} kg</span>
+                                    <span className="text-neutral-600 mx-2">|</span>
+                                    <span className="font-bold text-white">S/ {Number(sale.totalPrice).toFixed(2)}</span>
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                    {sale.isPaid 
+                                        ? <span className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-900/50 flex items-center gap-1"><Banknote size={10}/> Pagado</span>
+                                        : <span className="text-[10px] text-rose-400 font-bold bg-rose-900/20 px-2 py-0.5 rounded border border-rose-900/50 flex items-center gap-1"><CreditCard size={10}/> Deuda: S/ {(sale.totalPrice - sale.amountPaid).toFixed(2)}</span>
+                                    }
+                                    {sale.status === 'EN_PUESTO' && (
+                                        <span className="text-[10px] text-amber-400 font-bold bg-amber-900/20 px-2 py-0.5 rounded border border-amber-900/50 flex items-center gap-1"><Package size={10}/> En Puesto</span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-2 pl-2 border-l border-neutral-800">
+                                <button className="text-blue-400 hover:text-blue-300 p-1" onClick={() => handleEdit(sale)}><Pencil size={18} /></button>
+                                <button className="text-rose-400 hover:text-rose-300 p-1" onClick={() => handleDelete(sale.id)}><Trash2 size={18} /></button>
+                            </div>
+                        </div>
+                    ))}
+                    {recentSales.length === 0 && <div className="text-center text-neutral-600 py-8 text-sm italic">Tu historial de hoy está limpio.</div>}
+                </div>
+            </div>
         </div>
 
-        {/* LISTA DE ÚLTIMAS VENTAS */}
-        <div className="flex-1 overflow-auto pb-4">
-            <h3 className="text-sm font-bold text-zinc-500 mb-2 uppercase tracking-wider">Últimos Movimientos</h3>
-            <div className="space-y-2">
-                {recentSales.map((sale) => (
-                    <div key={sale.id} className={`p-3 rounded-lg border flex justify-between items-center shadow-sm ${sale.isPaid ? 'bg-white border-zinc-200' : 'bg-red-50 border-red-200'}`}>
-                        <div className="flex-1">
-                            <div className="font-bold text-zinc-800 flex items-center gap-2">
-                                {sale.batch.size} 
-                                <span className="text-xs font-normal text-zinc-400">({formatPeruTime(sale.createdAt)})</span>
-                            </div>
-                            <div className="text-sm text-zinc-600">
-                                {Number(sale.weightKg).toFixed(2)}kg x S/{Number(sale.pricePerKg)} = <span className="font-bold">S/{Number(sale.totalPrice).toFixed(2)}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                                {sale.isPaid ? (
-                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><Banknote size={12} /> Pagado</span>
-                                ) : (
-                                    <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><CreditCard size={12} /> {sale.amountPaid > 0 ? `A cta: ${sale.amountPaid}` : 'Fiado'} {sale.customerName ? ` (${sale.customerName})` : ''}</span>
-                                )}
-                                {sale.status === 'EN_PUESTO' ? (
-                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><Package size={12} /> En Puesto</span>
-                                ) : (
-                                    <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1"><CheckCircle size={12} /> Entregado</span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleEdit(sale)}><Pencil size={18} /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(sale.id)}><Trash2 size={18} /></Button>
-                        </div>
-                    </div>
-                ))}
-                {recentSales.length === 0 && <div className="text-center text-zinc-400 py-4 text-sm">No hay ventas recientes.</div>}
-            </div>
+        <div className="bg-neutral-900 border-t border-neutral-800 fixed bottom-0 w-full h-16 grid grid-cols-4 items-center z-50 pb-safe">
+            <button className="flex flex-col items-center justify-center text-blue-500 h-full border-t-2 border-blue-500">
+                <Store size={22} strokeWidth={2.5} />
+                <span className="text-[10px] font-bold mt-1">Ventas</span>
+            </button>
+            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-rose-400 h-full transition-colors border-t-2 border-transparent hover:border-rose-500/50" onClick={() => setCurrentView('expenses')}>
+                <TrendingDown size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Gastos</span>
+            </button>
+            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50" onClick={() => setCurrentView('history')}>
+                <History size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Historial</span>
+            </button>
+            <Link href="/reportes" className="flex flex-col items-center justify-center text-neutral-500 hover:text-purple-400 h-full transition-colors border-t-2 border-transparent hover:border-purple-500/50">
+                <PieChart size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Reportes</span>
+            </Link>
         </div>
       </div>
     );
   }
 
-  // --- VISTA CALCULADORA (STEP 2) ---
+  // --- VISTA CALCULADORA (STEP 2 - DARK MODE) ---
   return (
-    <div className={`p-4 flex flex-col h-screen max-h-screen ${editingSaleId ? 'bg-orange-50' : 'bg-zinc-50'}`}>
-      <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-lg border border-zinc-200 shadow-sm">
-        <Button variant="ghost" onClick={() => setStep(1)} className="gap-2" disabled={isPending}>
-            <ArrowLeft size={20} /> Cancelar
+    <div className={`flex flex-col h-screen max-h-screen bg-neutral-950 text-white`}>
+      <div className={`px-4 py-3 flex justify-between items-center ${editingSaleId ? 'bg-orange-900/20 text-orange-200' : 'bg-neutral-900 border-b border-neutral-800'}`}>
+        <Button variant="ghost" onClick={() => setStep(1)} className="hover:bg-white/5 px-0 -ml-2 text-inherit gap-1" disabled={isPending}>
+            <ArrowLeft size={20} /> <span className="text-sm font-bold">Volver</span>
         </Button>
         <div className="text-right">
-          <h2 className="font-bold text-xl text-zinc-800">{selectedBatch?.size}</h2>
-          <p className="text-sm text-zinc-500">{editingSaleId ? <span className="text-orange-600 font-bold">EDITANDO</span> : `Base: S/ ${selectedBatch?.price.toFixed(2)}`}</p>
+          <h2 className={`font-black text-xl ${editingSaleId ? 'text-orange-400' : 'text-blue-400'}`}>{selectedBatch?.size}</h2>
+          <p className="text-xs opacity-60">Base: S/ {selectedBatch?.price.toFixed(2)}</p>
         </div>
       </div>
 
-      <Card className={`p-4 mb-2 bg-white text-center shadow-md border-2 transition-colors ${isPendingPickup ? 'border-yellow-400' : 'border-blue-500'}`}>
-        <div className="grid grid-cols-2 gap-4 text-left border-b border-zinc-100 pb-2 mb-2">
-          <div>
-            <span className="text-xs text-zinc-400 block uppercase font-bold">Peso (Kg)</span>
-            <span className={`text-3xl font-mono ${inputMode === 'weight' ? 'text-blue-600 font-bold' : 'text-zinc-300'}`}>
-              {inputMode === 'weight' ? inputValue : weight.toFixed(3)}
-            </span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-zinc-400 block uppercase font-bold">Importe (S/)</span>
-            <span className={`text-3xl font-mono ${inputMode === 'money' ? 'text-green-600 font-bold' : 'text-zinc-300'}`}>
-              {inputMode === 'money' ? inputValue : total.toFixed(2)}
-            </span>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-2">
-            <Button onClick={toggleMode} variant="outline" className="flex-1 text-xs" disabled={isPending}>
-                <RefreshCcw className="w-3 h-3 mr-1" /> {inputMode === 'weight' ? 'Modo: PESO' : 'Modo: SOLES'}
-            </Button>
-            <Button onClick={() => setIsPendingPickup(!isPendingPickup)} className={`flex-1 text-xs border ${isPendingPickup ? 'bg-yellow-100 border-yellow-500 text-yellow-900' : 'bg-white text-zinc-500'}`} variant="ghost">
-                {isPendingPickup ? <><Package className="w-4 h-4 mr-1"/> En Puesto</> : <><UserCheck className="w-4 h-4 mr-1"/> Se lo lleva</>}
-            </Button>
-        </div>
-      </Card>
-
-      <Card className="p-3 mb-2 bg-white border border-zinc-200 shadow-sm">
-        <div className="flex gap-1 mb-2">
-            <Button onClick={() => { setPaymentType('full'); setPartialAmount(''); }} className={`flex-1 text-xs ${paymentType === 'full' ? 'bg-green-100 text-green-800 border-green-500 border' : 'bg-zinc-50 text-zinc-500'}`} variant="ghost">Todo</Button>
-            <Button onClick={() => { setPaymentType('partial'); }} className={`flex-1 text-xs ${paymentType === 'partial' ? 'bg-blue-100 text-blue-800 border-blue-500 border' : 'bg-zinc-50 text-zinc-500'}`} variant="ghost">A cuenta</Button>
-            <Button onClick={() => { setPaymentType('zero'); setPartialAmount(''); }} className={`flex-1 text-xs ${paymentType === 'zero' ? 'bg-red-100 text-red-800 border-red-500 border' : 'bg-zinc-50 text-zinc-500'}`} variant="ghost">Fiado</Button>
-        </div>
-        {paymentType === 'partial' && (
-            <div className="mb-2 flex items-center gap-2">
-                <span className="text-xs font-bold text-zinc-600">Monto: S/</span>
-                <input type="number" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="border rounded p-1 w-24 text-right font-bold" placeholder="0.00" />
+      <div className="flex-1 p-4 flex flex-col gap-4">
+        <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-4 left-4 text-[10px] font-bold tracking-widest text-neutral-500 uppercase">
+                {inputMode === 'weight' ? 'Ingresando Peso' : 'Ingresando Dinero'}
             </div>
-        )}
-        {paymentType !== 'full' && (
-            <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold text-red-600 bg-red-50 p-1 rounded">
-                    <span>Deuda:</span><span>S/ {currentDebt.toFixed(2)}</span>
+
+            <div className="flex flex-col gap-2 mt-4">
+                <div className="flex justify-between items-end">
+                    <span className="text-neutral-500 text-sm font-bold mb-1">Peso (Kg)</span>
+                    <span className={`text-4xl font-mono tracking-tight ${inputMode === 'weight' ? 'text-cyan-400 font-bold' : 'text-neutral-600'}`}>
+                        {inputMode === 'weight' ? inputValue : weight.toFixed(3)}
+                    </span>
                 </div>
-                <input type="text" placeholder="Nombre cliente (Obligatorio)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm outline-blue-500 bg-zinc-50" />
+                <div className="w-full h-px bg-neutral-800 my-2"></div>
+                <div className="flex justify-between items-end">
+                    <span className="text-neutral-500 text-sm font-bold mb-1">Total (S/)</span>
+                    <span className={`text-5xl font-mono tracking-tight ${inputMode === 'money' ? 'text-emerald-400 font-bold' : 'text-neutral-600'}`}>
+                        {inputMode === 'money' ? inputValue : total.toFixed(2)}
+                    </span>
+                </div>
             </div>
-        )}
-      </Card>
-
-      <div className="flex items-center justify-between mb-2 px-2">
-        <span className="text-sm font-bold text-zinc-600">Precio/Kg:</span>
-        <div className="flex items-center gap-2">
-            <Button size="icon" variant="outline" className="h-10 w-10" onClick={() => setFinalPrice(p => p - 0.5)} disabled={isPending}>-</Button>
-            <span className="text-xl font-bold w-16 text-center text-zinc-800">{finalPrice.toFixed(2)}</span>
-            <Button size="icon" variant="outline" className="h-10 w-10" onClick={() => setFinalPrice(p => p + 0.5)} disabled={isPending}>+</Button>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+            <Button onClick={toggleMode} variant="outline" className="h-12 bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700 hover:text-white border-0">
+                <RefreshCcw className="w-4 h-4 mr-2" /> {inputMode === 'weight' ? 'A Soles' : 'A Kilos'}
+            </Button>
+            <Button onClick={() => setIsPendingPickup(!isPendingPickup)} className={`h-12 border-0 ${isPendingPickup ? 'bg-amber-500 hover:bg-amber-600 text-black font-bold' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}>
+                {isPendingPickup ? <><Package className="w-4 h-4 mr-2"/> EN PUESTO</> : <><UserCheck className="w-4 h-4 mr-2"/> ENTREGADO</>}
+            </Button>
+        </div>
+
+        <Card className="p-3 bg-neutral-900 border-neutral-800">
+            <div className="flex gap-2 mb-3">
+                <button onClick={() => { setPaymentType('full'); setPartialAmount(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${paymentType === 'full' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/50' : 'bg-neutral-800 text-neutral-400'}`}>Pagado</button>
+                <button onClick={() => { setPaymentType('partial'); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${paymentType === 'partial' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50' : 'bg-neutral-800 text-neutral-400'}`}>A Cuenta</button>
+                <button onClick={() => { setPaymentType('zero'); setPartialAmount(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${paymentType === 'zero' ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/50' : 'bg-neutral-800 text-neutral-400'}`}>Fiado</button>
+            </div>
+            
+            {(paymentType !== 'full') && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    {paymentType === 'partial' && (
+                        <div className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700">
+                            <span className="text-xs font-bold text-neutral-400">Paga: S/</span>
+                            <input type="number" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="bg-transparent text-white text-right font-bold w-full outline-none" placeholder="0.00" autoFocus />
+                        </div>
+                    )}
+                    <input type="text" placeholder="Nombre del Cliente (Obligatorio)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-3 text-sm text-white placeholder:text-neutral-500 outline-none focus:border-blue-500 transition-colors" />
+                    <div className="text-right text-xs font-bold text-rose-400">Deuda Restante: S/ {currentDebt.toFixed(2)}</div>
+                </div>
+            )}
+        </Card>
+
+        <div className="flex items-center justify-between px-2 py-1 bg-neutral-800/50 rounded-lg border border-neutral-800">
+            <span className="text-xs font-bold text-neutral-500 uppercase">Precio / Kg</span>
+            <div className="flex items-center gap-4">
+                <button className="w-8 h-8 rounded-full bg-neutral-700 text-white flex items-center justify-center active:scale-95 hover:bg-neutral-600" onClick={() => setFinalPrice(p => p - 0.5)}>-</button>
+                <span className="text-lg font-mono font-bold text-white">{finalPrice.toFixed(2)}</span>
+                <button className="w-8 h-8 rounded-full bg-neutral-700 text-white flex items-center justify-center active:scale-95 hover:bg-neutral-600" onClick={() => setFinalPrice(p => p + 0.5)}>+</button>
+            </div>
+        </div>
+
       </div>
 
-      <div className="grid grid-cols-3 gap-2 flex-1 mb-4">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-          <Button key={n} variant="outline" className="text-3xl h-full font-bold text-zinc-700 active:bg-zinc-200" onClick={() => handleNumPad(n.toString())} disabled={isPending}>{n}</Button>
-        ))}
-        <Button variant="outline" className="text-3xl h-full text-zinc-700" onClick={() => handleNumPad('.')} disabled={isPending}>.</Button>
-        <Button variant="outline" className="text-3xl h-full font-bold text-zinc-700" onClick={() => handleNumPad('0')} disabled={isPending}>0</Button>
-        <Button variant="destructive" className="h-full bg-red-100 text-red-600 hover:bg-red-200 border-none" onClick={handleClear} disabled={isPending}><Delete /></Button>
-      </div>
+      <div className="bg-neutral-900 p-4 pt-2 pb-6 grid grid-cols-[3fr_1fr] gap-3 h-[38vh] border-t border-neutral-800">
+        <div className="grid grid-cols-3 gap-2">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                <button key={n} className="bg-neutral-800 text-white text-2xl font-bold rounded-xl hover:bg-neutral-700 active:bg-neutral-600 transition-colors shadow-sm" onClick={() => handleNumPad(n.toString())} disabled={isPending}>{n}</button>
+            ))}
+            <button className="bg-neutral-800 text-white text-2xl font-bold rounded-xl hover:bg-neutral-700" onClick={() => handleNumPad('.')} disabled={isPending}>.</button>
+            <button className="bg-neutral-800 text-white text-2xl font-bold rounded-xl hover:bg-neutral-700" onClick={() => handleNumPad('0')} disabled={isPending}>0</button>
+            <button className="bg-rose-900/20 text-rose-500 rounded-xl hover:bg-rose-900/40 flex items-center justify-center border border-rose-900/30" onClick={handleClear} disabled={isPending}><Delete /></button>
+        </div>
 
-      <Button onClick={handleSave} disabled={isPending || total === 0} className={`w-full h-16 text-xl shadow-lg transition-all ${isPending ? 'bg-zinc-400' : editingSaleId ? 'bg-orange-500 hover:bg-orange-600 text-white' : isPendingPickup ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}>
-        {isPending ? <Loader2 className="animate-spin" /> : (editingSaleId ? <>✏️ ACTUALIZAR</> : (isPendingPickup ? <>📦 EN PUESTO - S/ {total.toFixed(2)}</> : <>✅ COBRAR - S/ {total.toFixed(2)}</>))}
-      </Button>
+        <button 
+            onClick={handleSave} 
+            disabled={isPending || total === 0} 
+            className={`rounded-2xl font-bold text-xl flex flex-col items-center justify-center gap-2 shadow-lg transition-all ${
+                editingSaleId ? 'bg-orange-600 text-white hover:bg-orange-500' : 
+                isPendingPickup ? 'bg-amber-500 text-black hover:bg-amber-400' : 
+                'bg-emerald-600 text-white hover:bg-emerald-500 active:scale-95'
+            }`}
+        >
+            {isPending ? <Loader2 className="animate-spin" /> : (editingSaleId ? <><Pencil/> EDITAR</> : (isPendingPickup ? <><Package/> GUARDAR</> : <><CheckCircle size={32}/> COBRAR</>))}
+        </button>
+      </div>
     </div>
   );
 }
