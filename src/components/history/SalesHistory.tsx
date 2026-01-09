@@ -3,8 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Calendar, Pencil, Trash2, Banknote, CreditCard, Package, CheckCircle, Search, Filter } from 'lucide-react';
+import { 
+  ArrowLeft, Calendar, Pencil, Trash2, Banknote, CreditCard, 
+  Package, CheckCircle, Search, Filter, Store, TrendingDown, History, PieChart 
+} from 'lucide-react';
 import { getSalesByDate, deleteSale } from '@/actions/sales';
+import Link from 'next/link';
 
 type SaleRecord = {
     id: string;
@@ -24,25 +28,17 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
   const [date, setDate] = useState(today);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // Estado para el filtro de producto
   const [selectedProduct, setSelectedProduct] = useState<string>('TODOS');
 
-  useEffect(() => {
-    loadSales();
-  }, [date]);
+  useEffect(() => { loadSales(); }, [date]);
 
   const loadSales = async () => {
     setLoading(true);
     try {
         const data = await getSalesByDate(date);
         setSales(data as unknown as SaleRecord[]);
-        setSelectedProduct('TODOS'); // Resetear filtro al cambiar fecha
-    } catch (error) {
-        console.error(error);
-    } finally {
-        setLoading(false);
-    }
+        setSelectedProduct('TODOS');
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -55,136 +51,162 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
     return new Date(d).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
-  // 1. OBTENER LISTA ÚNICA DE PRODUCTOS VENDIDOS HOY
   const productTypes = useMemo(() => {
     const types = new Set(sales.map(s => s.batch.size));
     return Array.from(types).sort();
   }, [sales]);
 
-  // 2. FILTRAR VENTAS SEGÚN SELECCIÓN
   const filteredSales = useMemo(() => {
     if (selectedProduct === 'TODOS') return sales;
     return sales.filter(s => s.batch.size === selectedProduct);
   }, [sales, selectedProduct]);
 
-  // 3. CALCULAR TOTAL DEL FILTRO ACTUAL (Para que sepas cuánto suma lo que ves)
   const totalFiltered = filteredSales.reduce((acc, curr) => acc + curr.totalPrice, 0);
   const weightFiltered = filteredSales.reduce((acc, curr) => acc + curr.weightKg, 0);
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-100 p-4">
+    <div className="flex flex-col h-screen bg-neutral-950 text-white p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft />
-            </Button>
-            <h1 className="text-xl font-bold text-zinc-800">Historial</h1>
+      <div className="flex items-center gap-3 mb-6 border-b border-neutral-800 pb-4 sticky top-0 bg-neutral-950 z-10">
+        <Button variant="ghost" size="icon" onClick={onBack} className="hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-full">
+          <ArrowLeft />
+        </Button>
+        <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Historial de Ventas</h1>
+            <p className="text-xs text-blue-400 font-medium">Registro Diario</p>
         </div>
       </div>
 
-      {/* BARRA DE FILTROS */}
-      <Card className="p-3 mb-4 space-y-3 bg-white shadow-sm border-zinc-200">
-        {/* Fila 1: Fecha y Botón Buscar */}
-        <div className="flex items-center gap-3">
-            <Calendar className="text-zinc-400" />
-            <input 
-                type="date" 
-                value={date} 
-                onChange={(e) => setDate(e.target.value)}
-                className="flex-1 bg-transparent text-lg font-bold text-zinc-700 outline-none"
-            />
-            <Button size="icon" variant="ghost" onClick={loadSales}>
-                <Search size={20} />
-            </Button>
-        </div>
+      {/* CONTENIDO PRINCIPAL */}
+      <div className="flex-1 overflow-auto space-y-4 pb-24"> {/* pb-24 para el navbar */}
+        
+        {/* BARRA DE FILTROS */}
+        <Card className="p-4 space-y-4 bg-neutral-900 border-neutral-800 shadow-lg">
+            {/* Fila 1: Fecha */}
+            <div className="flex items-center gap-3 bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                <Calendar className="text-neutral-500" size={20} />
+                <input 
+                    type="date" 
+                    value={date} 
+                    onChange={(e) => setDate(e.target.value)}
+                    className="flex-1 bg-transparent text-base font-bold text-white outline-none"
+                />
+                <Button size="icon" variant="ghost" onClick={loadSales} className="h-8 w-8 text-blue-500 hover:bg-blue-900/20 hover:text-blue-400">
+                    <Search size={18} />
+                </Button>
+            </div>
 
-        {/* Fila 2: Filtro de Producto (Select) */}
+            {/* Fila 2: Filtro de Producto */}
+            {sales.length > 0 && (
+                <div className="flex items-center gap-3 pt-2 border-t border-neutral-800">
+                    <Filter className="text-neutral-500" size={18} />
+                    <select 
+                        value={selectedProduct}
+                        onChange={(e) => setSelectedProduct(e.target.value)}
+                        className="flex-1 bg-transparent text-sm font-medium text-neutral-300 outline-none py-1"
+                    >
+                        <option value="TODOS" className="bg-neutral-900 text-white">Todos los productos ({sales.length})</option>
+                        {productTypes.map(type => (
+                            <option key={type} value={type} className="bg-neutral-900 text-white">{type}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+        </Card>
+
+        {/* RESUMEN RÁPIDO */}
         {sales.length > 0 && (
-            <div className="flex items-center gap-3 border-t pt-2 mt-2">
-                <Filter className="text-zinc-400" size={20} />
-                <select 
-                    value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(e.target.value)}
-                    className="flex-1 bg-transparent text-sm font-semibold text-zinc-700 outline-none py-1"
-                >
-                    <option value="TODOS">Todos los productos ({sales.length})</option>
-                    {productTypes.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                    ))}
-                </select>
+            <div className="flex justify-between px-2 mb-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                <span>{filteredSales.length} movimientos</span>
+                <span>Total: <span className="text-emerald-500">S/ {totalFiltered.toFixed(2)}</span> • {weightFiltered.toFixed(2)} kg</span>
             </div>
         )}
-      </Card>
 
-      {/* RESUMEN RÁPIDO DEL FILTRO */}
-      {sales.length > 0 && (
-          <div className="flex justify-between px-2 mb-2 text-xs font-bold text-zinc-500 uppercase">
-              <span>{filteredSales.length} ventas</span>
-              <span>Total: S/ {totalFiltered.toFixed(2)} ({weightFiltered.toFixed(2)} kg)</span>
-          </div>
-      )}
-
-      {/* LISTA FILTRADA */}
-      <div className="flex-1 overflow-auto space-y-2 pb-4">
+        {/* LISTA FILTRADA */}
         {loading ? (
-            <div className="text-center py-10 text-zinc-400">Cargando...</div>
+            <div className="flex flex-col items-center justify-center py-12 text-neutral-500 space-y-2">
+                <div className="animate-spin text-blue-500"><Search size={24}/></div>
+                <span className="text-xs">Buscando registros...</span>
+            </div>
         ) : filteredSales.length === 0 ? (
-            <div className="text-center py-10 text-zinc-400">
-                {sales.length === 0 ? "No hay ventas en esta fecha." : "No hay ventas de este producto."}
+            <div className="flex flex-col items-center justify-center py-12 text-neutral-600 space-y-3 border-2 border-dashed border-neutral-800 rounded-xl bg-neutral-900/30">
+                <Search size={32} className="opacity-20" />
+                <span className="text-sm font-medium">
+                    {sales.length === 0 ? "No hay ventas en esta fecha." : "No hay ventas de este producto."}
+                </span>
             </div>
         ) : (
             filteredSales.map((sale) => (
-                <div key={sale.id} className={`p-3 rounded-lg border flex justify-between items-center shadow-sm bg-white ${sale.isPaid ? 'border-zinc-200' : 'border-red-200'}`}>
+                <div key={sale.id} className={`p-4 rounded-xl border shadow-sm transition-colors flex justify-between items-center ${sale.isPaid ? 'bg-neutral-900 border-neutral-800' : 'bg-rose-950/10 border-rose-900/30'}`}>
                     <div className="flex-1">
-                        <div className="flex justify-between items-start pr-2">
-                            <span className="font-bold text-zinc-800 text-lg">{sale.batch.size}</span>
-                            <span className="text-xs text-zinc-400 font-mono mt-1">{formatTime(sale.createdAt)}</span>
+                        <div className="flex justify-between items-start pr-2 mb-1">
+                            <span className="font-bold text-white text-lg">{sale.batch.size}</span>
+                            <span className="text-[10px] text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">{formatTime(sale.createdAt)}</span>
                         </div>
                         
-                        <div className="text-sm text-zinc-600 my-1">
-                            {Number(sale.weightKg).toFixed(2)}kg x S/{Number(sale.pricePerKg)} = <span className="font-bold text-zinc-900">S/{Number(sale.totalPrice).toFixed(2)}</span>
+                        <div className="text-sm text-neutral-400 mb-2">
+                            <span className="text-neutral-200 font-medium">{Number(sale.weightKg).toFixed(2)} kg</span>
+                            <span className="mx-1.5 opacity-30">|</span>
+                            <span className="text-white font-bold">S/ {Number(sale.totalPrice).toFixed(2)}</span>
                         </div>
                         
                         <div className="flex flex-wrap gap-2">
-                            {/* Pago */}
                             {sale.isPaid ? (
-                                <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-900/50 flex items-center gap-1">
                                     <Banknote size={10} /> Pagado
                                 </span>
                             ) : (
-                                <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <span className="text-[10px] text-rose-400 font-bold bg-rose-900/20 px-2 py-0.5 rounded border border-rose-900/50 flex items-center gap-1">
                                     <CreditCard size={10} /> 
                                     {sale.amountPaid > 0 ? `A cta: ${sale.amountPaid}` : 'Fiado'}
                                     {sale.customerName ? ` (${sale.customerName})` : ''}
                                 </span>
                             )}
                             
-                            {/* Estado Entrega */}
                             {sale.status === 'EN_PUESTO' ? (
-                                <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <span className="text-[10px] text-amber-400 font-bold bg-amber-900/20 px-2 py-0.5 rounded border border-amber-900/50 flex items-center gap-1">
                                     <Package size={10} /> En Puesto
                                 </span>
                             ) : (
-                                <span className="text-[10px] bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <span className="text-[10px] text-neutral-400 font-bold bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700 flex items-center gap-1">
                                     <CheckCircle size={10} /> Entregado
                                 </span>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 border-l pl-2 ml-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => onEdit(sale)}>
-                            <Pencil size={18} />
+                    <div className="flex flex-col gap-2 border-l border-neutral-800 pl-3 ml-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg" onClick={() => onEdit(sale)}>
+                            <Pencil size={16} />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:bg-red-50" onClick={() => handleDelete(sale.id)}>
-                            <Trash2 size={18} />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:text-rose-300 hover:bg-rose-900/20 rounded-lg" onClick={() => handleDelete(sale.id)}>
+                            <Trash2 size={16} />
                         </Button>
                     </div>
                 </div>
             ))
         )}
       </div>
+
+      {/* BOTTOM NAVIGATION (ACTIVE: HISTORIAL) */}
+      <div className="bg-neutral-900 border-t border-neutral-800 fixed bottom-0 w-full h-16 grid grid-cols-4 items-center z-50 pb-safe left-0">
+            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50" onClick={onBack}>
+                <Store size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Ventas</span>
+            </button>
+            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-rose-400 h-full transition-colors border-t-2 border-transparent hover:border-rose-500/50" onClick={onBack}>
+                <TrendingDown size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Gastos</span>
+            </button>
+            <button className="flex flex-col items-center justify-center text-blue-500 h-full border-t-2 border-blue-500">
+                <History size={22} strokeWidth={2.5} />
+                <span className="text-[10px] font-bold mt-1">Historial</span>
+            </button>
+            <Link href="/reportes" className="flex flex-col items-center justify-center text-neutral-500 hover:text-purple-400 h-full transition-colors border-t-2 border-transparent hover:border-purple-500/50">
+                <PieChart size={22} strokeWidth={2} />
+                <span className="text-[10px] font-medium mt-1">Reportes</span>
+            </Link>
+        </div>
     </div>
   );
 }
