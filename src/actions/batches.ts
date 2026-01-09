@@ -3,13 +3,39 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
+// --- FUNCIÓN MÁGICA PARA OBTENER RANGO DE FECHAS EN PERÚ ---
+function getPeruDateRange() {
+    // Obtenemos la hora actual en la zona horaria de Lima
+    const now = new Date();
+    const peruTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    
+    // Inicio del día en Perú
+    const startOfDay = new Date(peruTime);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    // Fin del día en Perú
+    const endOfDay = new Date(peruTime);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Ajustamos el desfase UTC para que Prisma (que trabaja en UTC) entienda
+    // Si Perú es UTC-5, le sumamos 5 horas para que coincida con el servidor
+    // O mejor aún: usamos las fechas tal cual para comparar rangos, Prisma maneja las conversiones si le pasamos objetos Date correctos.
+    
+    // TRUCO: Para evitar lios con Prisma y zonas horarias, usaremos el rango calculado localmente 
+    // pero asegurándonos de que cubra el "día lógico" en Perú.
+    return { startOfDay, endOfDay };
+}
+
 export async function getTodayBatches() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const { startOfDay, endOfDay } = getPeruDateRange();
 
   const batches = await prisma.dailyBatch.findMany({
     where: {
-      date: { gte: today },
+      // Buscamos lotes creados entre las 00:00 y 23:59 hora PERÚ
+      date: {
+        gte: startOfDay,
+        lte: endOfDay
+      },
       isActive: true,
     },
     orderBy: { size: 'asc' }
@@ -19,26 +45,26 @@ export async function getTodayBatches() {
     id: b.id,
     size: b.size,
     price: b.basePricePerKg.toNumber(),
-    // Calculamos las cajas restantes visualmente (Iniciales - Consumidas)
     remainingCrates: b.initialCrates - b.consumedCrates, 
     initialCrates: b.initialCrates,
     stockKg: (b.initialCrates * b.avgWeightPerCrate.toNumber())
   }));
 }
 
-// ESTA FUNCIÓN AHORA ES INTELIGENTE: SUMA SI YA EXISTE
 export async function openDay(data: { size: string, price: number, crates: number }[]) {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { startOfDay, endOfDay } = getPeruDateRange();
 
     for (const item of data) {
-      // 1. Buscamos si ya existe un lote de este tamaño y precio hoy
+      // 1. Buscamos si ya existe un lote de este tamaño y precio HOY (Hora Perú)
       const existingBatch = await prisma.dailyBatch.findFirst({
         where: {
-          date: { gte: today },
+          date: {
+            gte: startOfDay,
+            lte: endOfDay
+          },
           size: item.size,
-          basePricePerKg: item.price, // Mismo precio
+          basePricePerKg: item.price,
           isActive: true
         }
       });
@@ -52,13 +78,17 @@ export async function openDay(data: { size: string, price: number, crates: numbe
           }
         });
       } else {
-        // 3. Si no existe (o el precio es diferente), CREAMOS uno nuevo
+        // 3. Si no existe, creamos uno nuevo CON LA FECHA ACTUAL PERÚ
+        const nowPeru = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Lima' }));
+        
         await prisma.dailyBatch.create({
           data: {
             size: item.size,
             basePricePerKg: item.price,
             initialCrates: item.crates,
             avgWeightPerCrate: 24.0,
+            date: nowPeru, // <--- IMPORTANTE: Guardamos con la hora de Perú
+            isActive: true
           }
         });
       }
@@ -72,7 +102,7 @@ export async function openDay(data: { size: string, price: number, crates: numbe
   }
 }
 
-// ACTUALIZAR PRECIO O STOCK INICIAL
+// ... (El resto de funciones updateBatch y deleteBatch quedan IGUAL, ya que usan ID único)
 export async function updateBatch(id: string, price: number, initialCrates: number) {
   try {
     await prisma.dailyBatch.update({
@@ -90,24 +120,19 @@ export async function updateBatch(id: string, price: number, initialCrates: numb
   }
 }
 
-// ELIMINAR LOTE (O DESACTIVAR SI YA TIENE VENTAS)
 export async function deleteBatch(id: string) {
   try {
-    // 1. Verificamos si ya tiene ventas asociadas
     const batch = await prisma.dailyBatch.findUnique({
         where: { id },
         include: { _count: { select: { sales: true } } }
     });
 
     if (batch && batch._count.sales > 0) {
-        // Si ya vendiste de esta caja, NO la borramos, solo la ocultamos (isActive=false)
-        // para no romper el historial de reportes.
         await prisma.dailyBatch.update({
             where: { id },
             data: { isActive: false }
         });
     } else {
-        // Si está virgen (0 ventas), la borramos de la base de datos
         await prisma.dailyBatch.delete({ where: { id } });
     }
     
