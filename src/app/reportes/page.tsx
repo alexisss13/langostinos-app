@@ -5,10 +5,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, Calendar, TrendingUp, TrendingDown, Users, 
-  Wallet, AlertCircle, Package, Store, History, PieChart 
+  Wallet, AlertCircle, Package, PieChart 
 } from 'lucide-react';
 import Link from 'next/link';
 import { getDailyStats } from '@/actions/reports';
+import BottomNav from '@/components/layout/BottomNav'; // IMPORTAMOS
 
 type ReportData = {
   summary: {
@@ -195,26 +196,8 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION (ACTIVE: REPORTES) */}
-      <div className="bg-neutral-900 border-t border-neutral-800 fixed bottom-0 w-full h-16 grid grid-cols-4 items-center z-50 pb-safe">
-            <Link href="/" className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50">
-                <Store size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Ventas</span>
-            </Link>
-            {/* Nota: Gastos e Historial requieren estado interno, por eso mejor volver a Ventas primero */}
-            <Link href="/" className="flex flex-col items-center justify-center text-neutral-500 hover:text-rose-400 h-full transition-colors border-t-2 border-transparent hover:border-rose-500/50">
-                <TrendingDown size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Gastos</span>
-            </Link>
-            <Link href="/" className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50">
-                <History size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Historial</span>
-            </Link>
-            <button className="flex flex-col items-center justify-center text-purple-500 h-full border-t-2 border-purple-500">
-                <PieChart size={22} strokeWidth={2.5} />
-                <span className="text-[10px] font-bold mt-1">Reportes</span>
-            </button>
-        </div>
+      {/* AHORA SÍ: BOTTOM NAV COMPARTIDO */}
+      <BottomNav />
     </div>
   );
 }

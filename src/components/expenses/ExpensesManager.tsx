@@ -1,18 +1,13 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Plus, Loader2, Trash2, Snowflake, Zap, Coffee, Fuel, Droplet, Store, TrendingDown, History, PieChart } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Trash2, Snowflake, Zap, Coffee, Fuel, Droplet } from 'lucide-react';
 import { registerExpense, getRecentExpenses, deleteExpense } from '@/actions/expenses';
-import Link from 'next/link';
+import BottomNav from '@/components/layout/BottomNav'; // IMPORTAR NAV
 
-type ExpenseRecord = {
-    id: string;
-    description: string;
-    amount: number;
-    date: Date;
-};
+type ExpenseRecord = { id: string; description: string; amount: number; date: Date; };
 
 export default function ExpensesManager({ onBack }: { onBack: () => void }) {
   const [description, setDescription] = useState('');
@@ -67,20 +62,14 @@ export default function ExpensesManager({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="space-y-6 flex-1 overflow-auto pb-24"> {/* pb-24 para dejar espacio al navbar */}
+      <div className="space-y-6 flex-1 overflow-auto pb-24">
         
         {/* FORMULARIO */}
         <Card className="p-5 bg-neutral-900 border-neutral-800 shadow-lg">
             <div className="space-y-5">
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Concepto del Gasto</label>
-                    <input 
-                        type="text"
-                        placeholder="Ej: Hielo, Petróleo..." 
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="flex h-12 w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-2 text-base text-white placeholder:text-neutral-600 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none transition-all"
-                    />
+                    <input type="text" placeholder="Ej: Hielo, Petróleo..." value={description} onChange={(e) => setDescription(e.target.value)} className="flex h-12 w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-2 text-base text-white placeholder:text-neutral-600 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none transition-all"/>
                     
                     <div className="flex gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar">
                         <button onClick={() => setQuickExpense('Hielo')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-800 border border-neutral-700 text-xs font-medium text-cyan-400 hover:bg-neutral-700 whitespace-nowrap transition-colors"><Snowflake size={14}/> Hielo</button>
@@ -95,20 +84,9 @@ export default function ExpensesManager({ onBack }: { onBack: () => void }) {
                     <div className="flex gap-3">
                         <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 font-bold">S/</span>
-                            <input 
-                                type="number" 
-                                placeholder="0.00" 
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="flex h-14 w-full rounded-xl border border-neutral-700 bg-neutral-950 pl-10 pr-4 py-2 text-2xl font-bold text-white placeholder:text-neutral-700 focus:border-rose-500 outline-none transition-all"
-                            />
+                            <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="flex h-14 w-full rounded-xl border border-neutral-700 bg-neutral-950 pl-10 pr-4 py-2 text-2xl font-bold text-white placeholder:text-neutral-700 focus:border-rose-500 outline-none transition-all"/>
                         </div>
-                        <Button 
-                            size="icon" 
-                            className="h-14 w-20 bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-900/20 rounded-xl shrink-0 transition-all active:scale-95"
-                            onClick={handleSave}
-                            disabled={isPending || !amount || !description}
-                        >
+                        <Button size="icon" className="h-14 w-20 bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-900/20 rounded-xl shrink-0 transition-all active:scale-95" onClick={handleSave} disabled={isPending || !amount || !description}>
                             {isPending ? <Loader2 className="animate-spin text-white"/> : <Plus size={32} className="text-white" />}
                         </Button>
                     </div>
@@ -123,21 +101,15 @@ export default function ExpensesManager({ onBack }: { onBack: () => void }) {
                 {expenses.map((expense) => (
                     <div key={expense.id} className="flex justify-between items-center p-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-sm hover:border-neutral-700 transition-colors">
                         <div className="flex items-center gap-3">
-                            <div className="bg-rose-900/20 p-2.5 rounded-full text-rose-500">
-                                <Zap size={18} />
-                            </div>
+                            <div className="bg-rose-900/20 p-2.5 rounded-full text-rose-500"><Zap size={18} /></div>
                             <div>
                                 <p className="font-bold text-neutral-200 text-sm">{expense.description}</p>
-                                <p className="text-[10px] text-neutral-500 font-medium bg-neutral-800 px-1.5 py-0.5 rounded w-fit mt-1">
-                                    {new Date(expense.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute:'2-digit', hour12: true })}
-                                </p>
+                                <p className="text-[10px] text-neutral-500 font-medium bg-neutral-800 px-1.5 py-0.5 rounded w-fit mt-1">{new Date(expense.date).toLocaleTimeString('es-PE', { hour: '2-digit', minute:'2-digit', hour12: true })}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-rose-400 text-lg">- S/ {Number(expense.amount).toFixed(2)}</span>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-600 hover:text-rose-500 hover:bg-rose-900/10 rounded-full" onClick={() => handleDelete(expense.id)}>
-                                <Trash2 size={18} />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-600 hover:text-rose-500 hover:bg-rose-900/10 rounded-full" onClick={() => handleDelete(expense.id)}><Trash2 size={18} /></Button>
                         </div>
                     </div>
                 ))}
@@ -152,26 +124,7 @@ export default function ExpensesManager({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      {/* BOTTOM NAVIGATION (ACTIVE: GASTOS) */}
-      <div className="bg-neutral-900 border-t border-neutral-800 fixed bottom-0 w-full h-16 grid grid-cols-4 items-center z-50 pb-safe left-0">
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50" onClick={onBack}>
-                <Store size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Ventas</span>
-            </button>
-            <button className="flex flex-col items-center justify-center text-rose-500 h-full border-t-2 border-rose-500">
-                <TrendingDown size={22} strokeWidth={2.5} />
-                <span className="text-[10px] font-bold mt-1">Gastos</span>
-            </button>
-            {/* Nota: Historial es otra vista interna, mejor volver al dashboard principal primero */}
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50" onClick={onBack}>
-                <History size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Historial</span>
-            </button>
-            <Link href="/reportes" className="flex flex-col items-center justify-center text-neutral-500 hover:text-purple-400 h-full transition-colors border-t-2 border-transparent hover:border-purple-500/50">
-                <PieChart size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Reportes</span>
-            </Link>
-        </div>
+      <BottomNav /> {/* AQUI TAMBIEN */}
     </div>
   );
 }

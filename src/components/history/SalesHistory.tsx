@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { 
   ArrowLeft, Calendar, Pencil, Trash2, Banknote, CreditCard, 
-  Package, CheckCircle, Search, Filter, Store, TrendingDown, History, PieChart 
+  Package, CheckCircle, Search, Filter 
 } from 'lucide-react';
 import { getSalesByDate, deleteSale } from '@/actions/sales';
-import Link from 'next/link';
+import BottomNav from '@/components/layout/BottomNav'; // IMPORTAMOS
 
 type SaleRecord = {
     id: string;
@@ -188,25 +188,8 @@ export default function SalesHistory({ onBack, onEdit }: { onBack: () => void, o
         )}
       </div>
 
-      {/* BOTTOM NAVIGATION (ACTIVE: HISTORIAL) */}
-      <div className="bg-neutral-900 border-t border-neutral-800 fixed bottom-0 w-full h-16 grid grid-cols-4 items-center z-50 pb-safe left-0">
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full transition-colors border-t-2 border-transparent hover:border-blue-500/50" onClick={onBack}>
-                <Store size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Ventas</span>
-            </button>
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-rose-400 h-full transition-colors border-t-2 border-transparent hover:border-rose-500/50" onClick={onBack}>
-                <TrendingDown size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Gastos</span>
-            </button>
-            <button className="flex flex-col items-center justify-center text-blue-500 h-full border-t-2 border-blue-500">
-                <History size={22} strokeWidth={2.5} />
-                <span className="text-[10px] font-bold mt-1">Historial</span>
-            </button>
-            <Link href="/reportes" className="flex flex-col items-center justify-center text-neutral-500 hover:text-purple-400 h-full transition-colors border-t-2 border-transparent hover:border-purple-500/50">
-                <PieChart size={22} strokeWidth={2} />
-                <span className="text-[10px] font-medium mt-1">Reportes</span>
-            </Link>
-        </div>
+      {/* AQUI ESTÁ LA MAGIA: BOTTOM NAV COMPARTIDO */}
+      <BottomNav />
     </div>
   );
 }

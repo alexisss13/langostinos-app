@@ -3,27 +3,14 @@
 import { useState, useEffect, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, PackageOpen, Save, Trash2, Edit2, Check, X, ArrowLeft, PlusCircle, Box, Store, TrendingDown, History, PieChart } from 'lucide-react';
+import { Loader2, PackageOpen, Save, Trash2, Edit2, Check, X, ArrowLeft, PlusCircle, Box } from 'lucide-react';
 import { openDay, getTodayBatches, updateBatch, deleteBatch } from '@/actions/batches';
-import Link from 'next/link';
+import BottomNav from '@/components/layout/BottomNav'; // IMPORTAR NAV
 
 const SUGGESTED_SIZES = ['Pequeño', 'Mediano', 'Grande', 'Jumbo', 'Pescado', 'Calamar'];
 
-type BatchData = { 
-    id: string; 
-    size: string; 
-    price: number; 
-    stockKg: number; 
-    initialCrates: number; 
-    remainingCrates: number; 
-};
-
-type NewItem = {
-    id: string;
-    size: string;
-    price: string;
-    crates: string;
-};
+type BatchData = { id: string; size: string; price: number; stockKg: number; initialCrates: number; remainingCrates: number; };
+type NewItem = { id: string; size: string; price: string; crates: string; };
 
 export default function OpeningForm({ onSuccess }: { onSuccess: () => void }) {
   const [existingBatches, setExistingBatches] = useState<BatchData[]>([]);
@@ -48,33 +35,18 @@ export default function OpeningForm({ onSuccess }: { onSuccess: () => void }) {
 
   const refreshBatches = () => setTrigger(t => t + 1);
 
-  // ... (Lógica de edición/creación igual que antes) ...
-  const startEdit = (batch: BatchData) => {
-    setEditingId(batch.id);
-    setEditPrice(batch.price.toString());
-    setEditCrates(batch.initialCrates.toString());
-  };
+  const startEdit = (batch: BatchData) => { setEditingId(batch.id); setEditPrice(batch.price.toString()); setEditCrates(batch.initialCrates.toString()); };
   const cancelEdit = () => { setEditingId(null); setEditPrice(''); setEditCrates(''); };
-  const saveEdit = (id: string) => {
-    startTransition(async () => {
-        await updateBatch(id, parseFloat(editPrice), parseInt(editCrates));
-        setEditingId(null); refreshBatches();
-    });
-  };
-  const handleDelete = (id: string) => {
-    if(!confirm("¿Borrar?")) return;
-    startTransition(async () => { await deleteBatch(id); refreshBatches(); });
-  };
-  const updateNewItem = (id: string, field: keyof NewItem, value: string) => {
-    setNewItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
+  const saveEdit = (id: string) => { startTransition(async () => { await updateBatch(id, parseFloat(editPrice), parseInt(editCrates)); setEditingId(null); refreshBatches(); }); };
+  const handleDelete = (id: string) => { if(!confirm("¿Borrar?")) return; startTransition(async () => { await deleteBatch(id); refreshBatches(); }); };
+  
+  const updateNewItem = (id: string, field: keyof NewItem, value: string) => { setNewItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item)); };
   const addNewRow = () => { setNewItems(prev => [...prev, { id: Date.now().toString(), size: '', price: '', crates: '' }]); };
   const removeNewRow = (id: string) => { setNewItems(prev => prev.filter(item => item.id !== id)); };
   const setSizeName = (id: string, name: string) => { updateNewItem(id, 'size', name); };
   
   const handleCreate = () => {
-    const dataToSave = newItems
-        .filter(item => item.size.trim() !== '' && parseFloat(item.price) > 0 && parseInt(item.crates) > 0)
+    const dataToSave = newItems.filter(item => item.size.trim() !== '' && parseFloat(item.price) > 0 && parseInt(item.crates) > 0)
         .map(item => ({ size: item.size.trim(), price: parseFloat(item.price), crates: parseInt(item.crates) }));
 
     if (dataToSave.length === 0) { alert("⚠️ Datos inválidos."); return; }
@@ -93,14 +65,10 @@ export default function OpeningForm({ onSuccess }: { onSuccess: () => void }) {
         <Button variant="ghost" size="icon" onClick={() => { setNewItems([{ id: '1', size: '', price: '', crates: '' }]); onSuccess(); }} className="hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-full">
             <ArrowLeft size={24}/>
         </Button>
-        <div>
-            <h1 className="text-lg font-bold text-white leading-tight">Inventario</h1>
-            <p className="text-xs text-neutral-500">Gestión de Cajas</p>
-        </div>
+        <div><h1 className="text-lg font-bold text-white leading-tight">Inventario</h1><p className="text-xs text-neutral-500">Gestión de Cajas</p></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24 scrollbar-hide">
-        
         {/* LOTES ACTIVOS */}
         {existingBatches.length > 0 && (
             <div className="mb-6">
@@ -120,10 +88,7 @@ export default function OpeningForm({ onSuccess }: { onSuccess: () => void }) {
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-neutral-800 p-2 rounded-lg"><Box size={18} className="text-blue-500" /></div>
-                                        <div>
-                                            <div className="font-bold text-white text-base">{batch.size}</div>
-                                            <div className="text-xs text-neutral-400">S/ {batch.price.toFixed(2)} • Ini: {batch.initialCrates}</div>
-                                        </div>
+                                        <div><div className="font-bold text-white text-base">{batch.size}</div><div className="text-xs text-neutral-400">S/ {batch.price.toFixed(2)} • Ini: {batch.initialCrates}</div></div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className={`text-xs font-bold px-2 py-1 rounded ${batch.remainingCrates > 0 ? 'bg-blue-900/30 text-blue-400' : 'bg-red-900/30 text-red-400'}`}>Restan: {batch.remainingCrates}</span>
@@ -179,25 +144,7 @@ export default function OpeningForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      {/* BOTTOM NAV */}
-      <div className="bg-neutral-900 border-t border-neutral-800 w-full h-16 grid grid-cols-4 items-center shrink-0 z-50">
-            <button className="flex flex-col items-center justify-center text-blue-500 h-full border-t-2 border-blue-500" onClick={onSuccess}>
-                <Store size={20} strokeWidth={2.5} />
-                <span className="text-[9px] font-bold mt-1">Ventas</span>
-            </button>
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-rose-400 h-full" onClick={onSuccess}>
-                <TrendingDown size={20} strokeWidth={2} />
-                <span className="text-[9px] font-medium mt-1">Gastos</span>
-            </button>
-            <button className="flex flex-col items-center justify-center text-neutral-500 hover:text-blue-400 h-full" onClick={onSuccess}>
-                <History size={20} strokeWidth={2} />
-                <span className="text-[9px] font-medium mt-1">Historial</span>
-            </button>
-            <Link href="/reportes" className="flex flex-col items-center justify-center text-neutral-500 hover:text-purple-400 h-full">
-                <PieChart size={20} strokeWidth={2} />
-                <span className="text-[9px] font-medium mt-1">Reportes</span>
-            </Link>
-        </div>
+      <BottomNav /> {/* AQUI ESTÁ LA MAGIA */}
     </div>
   );
 }
