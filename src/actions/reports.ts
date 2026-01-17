@@ -50,6 +50,7 @@ export async function getDailyStats(dateStr: string) {
       totalGastos += exp.amount.toNumber();
     });
 
+    // ACTUALIZADO: Ahora incluimos todos los detalles de la venta
     const debtors = sales
       .filter(s => !s.isPaid)
       .map(s => ({
@@ -57,7 +58,11 @@ export async function getDailyStats(dateStr: string) {
         client: s.customerName || 'Cliente Anónimo',
         debt: s.totalPrice.toNumber() - s.amountPaid.toNumber(),
         product: s.batch.size,
-        time: s.createdAt
+        time: s.createdAt,
+        weightKg: s.weightKg.toNumber(),        // ← NUEVO
+        pricePerKg: s.pricePerKg.toNumber(),    // ← NUEVO
+        totalPrice: s.totalPrice.toNumber(),    // ← NUEVO
+        amountPaid: s.amountPaid.toNumber()     // ← NUEVO
       }));
 
     // Agrupación por producto con DATOS REALES

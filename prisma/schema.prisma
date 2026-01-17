@@ -40,14 +40,25 @@ model Sale {
   pricePerKg   Decimal     @db.Decimal(10, 2) 
   totalPrice   Decimal     @db.Decimal(10, 2) 
   
-  // NUEVO: Cuánto soltó de billete realmente
   amountPaid   Decimal     @default(0) @db.Decimal(10, 2)
 
   isCrate      Boolean     @default(false) 
   status       SaleStatus  @default(ENTREGADO)
-  isPaid       Boolean     @default(true) // Si amountPaid < totalPrice, esto será false
+  isPaid       Boolean     @default(true) 
   customerName String?    
   createdAt    DateTime    @default(now())
+
+  // RELACIÓN CON PAGOS
+  payments     Payment[]
+}
+
+// NUEVO MODELO PARA HISTORIAL DE PAGOS
+model Payment {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(10, 2)
+  date      DateTime @default(now())
 }
 
 model Expense {

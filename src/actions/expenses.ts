@@ -19,8 +19,20 @@ export async function registerExpense(description: string, amount: number) {
 }
 
 export async function getRecentExpenses() {
+  // Obtener inicio y fin del día actual
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
   const expenses = await prisma.expense.findMany({
-    take: 10,
+    where: {
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
     orderBy: { date: 'desc' },
   });
   
