@@ -3,15 +3,53 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
-// Obtener deudas con historial de pagos
-export async function getDebtors() {
+// Definimos el tipo exacto para nuestra cláusula Where y evitamos el 'any'
+type DebtorsWhereClause = {
+  isPaid: boolean;
+  createdAt?: {
+    gte?: Date;
+    lte?: Date;
+  };
+};
+
+/**
+ * Obtiene la lista de deudores, opcionalmente filtrada por un rango de fechas.
+ * @param {string} [startDateStr] - Fecha de inicio en formato ISO o YYYY-MM-DD.
+ * @param {string} [endDateStr] - Fecha de fin en formato ISO o YYYY-MM-DD.
+ * @returns {Promise<Array>} Lista de ventas no pagadas con su historial.
+ */
+export async function getDebtors(startDateStr?: string, endDateStr?: string) {
   try {
+    // Inicializamos con nuestro tipo fuerte
+    const whereClause: DebtorsWhereClause = { 
+      isPaid: false 
+    };
+
+    // Si hay fechas, agregamos el filtro a createdAt
+    if (startDateStr || endDateStr) {
+      whereClause.createdAt = {};
+      
+      if (startDateStr) {
+        // Aseguramos que tome desde las 00:00:00
+        const start = new Date(startDateStr);
+        start.setHours(0, 0, 0, 0);
+        whereClause.createdAt.gte = start;
+      }
+      
+      if (endDateStr) {
+        // Aseguramos que tome hasta las 23:59:59
+        const end = new Date(endDateStr);
+        end.setHours(23, 59, 59, 999);
+        whereClause.createdAt.lte = end;
+      }
+    }
+
     const debts = await prisma.sale.findMany({
-      where: { isPaid: false },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: { 
         batch: true,
-        payments: { orderBy: { date: 'desc' } } // Traemos los pagos
+        payments: { orderBy: { date: 'desc' } }
       }
     });
 
@@ -32,12 +70,17 @@ export async function getDebtors() {
       }))
     }));
   } catch (error) {
-    console.error(error);
+    console.error("Error obteniendo deudores:", error);
     return [];
   }
 }
 
-// Amortizar creando registro de pago
+/**
+ * Amortiza la deuda de una venta específica creando un registro de pago.
+ * @param {string} saleId - ID de la venta.
+ * @param {number} amount - Monto a pagar.
+ * @returns {Promise<{success: boolean, message?: string}>} Resultado de la operación.
+ */
 export async function amortizeDebt(saleId: string, amount: number) {
   try {
     const sale = await prisma.sale.findUnique({ where: { id: saleId } });
@@ -48,7 +91,6 @@ export async function amortizeDebt(saleId: string, amount: number) {
     const newPaid = currentPaid + amount;
     const isPaid = newPaid >= (total - 0.01); 
 
-    // Transacción: Actualizar venta y crear pago
     await prisma.$transaction([
       prisma.sale.update({
         where: { id: saleId },
@@ -62,7 +104,7 @@ export async function amortizeDebt(saleId: string, amount: number) {
         data: {
           saleId: saleId,
           amount: amount,
-          date: new Date() // Fecha actual del pago
+          date: new Date()
         }
       })
     ]);

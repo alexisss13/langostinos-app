@@ -3,15 +3,15 @@
 import { useState, useEffect, useMemo, useTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Search, User, Calendar, DollarSign, CheckCircle, Loader2, Weight, Tag, History, TrendingDown, X } from 'lucide-react';
+import { ArrowLeft, Search, User, Calendar, DollarSign, CheckCircle, Loader2, Weight, Tag, History, TrendingDown, X, Download } from 'lucide-react';
 import Link from 'next/link';
 import BottomNav from '@/components/layout/BottomNav';
 import { getDebtors, amortizeDebt } from '@/actions/debtors';
 
 type PaymentRecord = {
-    id: string;
-    amount: number;
-    date: Date;
+  id: string;
+  amount: number;
+  date: Date;
 };
 
 type DebtRecord = {
@@ -31,25 +31,30 @@ export default function DebtorsPage() {
   const [debtors, setDebtors] = useState<DebtRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
+  // Estados para el filtro de fechas
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [isPending, startTransition] = useTransition();
 
+  // Se vuelve a ejecutar si cambia el trigger o las fechas
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
         setLoading(true);
         try {
-            const data = await getDebtors();
+            const data = await getDebtors(startDate || undefined, endDate || undefined);
             if (isMounted) setDebtors(data as unknown as DebtRecord[]);
         } catch (error) { console.error(error); } 
         finally { if (isMounted) setLoading(false); }
     };
     fetchData();
     return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, startDate, endDate]);
 
   const groupedDebts = useMemo(() => {
     const groups: Record<string, { totalDebt: number, records: DebtRecord[] }> = {};
@@ -79,6 +84,30 @@ export default function DebtorsPage() {
         setRefreshTrigger(prev => prev + 1);
       } else { alert("Error al pagar"); }
     });
+  };
+
+  const exportToCSV = () => {
+    if (debtors.length === 0) return alert("No hay datos para exportar");
+
+    // Cabeceras del CSV
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Cliente,Producto,Peso (kg),Precio/kg,Total Venta (S/),Pagado (S/),Deuda Actual (S/),Fecha Venta\n";
+    
+    // Filas
+    debtors.forEach(d => {
+      const dateStr = new Date(d.date).toLocaleDateString('es-PE');
+      // Envolvemos los textos en comillas para evitar errores con comas en los nombres
+      csvContent += `"${d.customer}","${d.product}",${d.weight},${d.price},${d.totalPrice},${d.amountPaid},${d.debt},"${dateStr}"\n`;
+    });
+    
+    // Generamos la descarga
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Reporte_Cobranzas_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -128,8 +157,8 @@ export default function DebtorsPage() {
           </div>
         </div>
 
-        {/* Barra de búsqueda mejorada */}
-        <div className="px-4 pb-4">
+        {/* Controles: Búsqueda, Filtros de Fecha y Exportar */}
+        <div className="px-4 pb-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
             <input 
@@ -147,6 +176,30 @@ export default function DebtorsPage() {
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex gap-2">
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-neutral-900/50 border border-neutral-800/50 rounded-xl px-3 py-2 text-xs text-neutral-300 outline-none focus:border-amber-500/50"
+              />
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full bg-neutral-900/50 border border-neutral-800/50 rounded-xl px-3 py-2 text-xs text-neutral-300 outline-none focus:border-amber-500/50"
+              />
+            </div>
+            <Button 
+              onClick={exportToCSV}
+              variant="outline"
+              className="bg-neutral-900/50 border-neutral-800/50 hover:bg-neutral-800 hover:text-white px-3"
+            >
+              <Download className="w-4 h-4 text-amber-500" />
+            </Button>
           </div>
         </div>
       </div>
@@ -167,10 +220,10 @@ export default function DebtorsPage() {
               <CheckCircle className="w-12 h-12 text-emerald-500" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">
-              {search ? "Sin resultados" : "¡Todo al día!"}
+              {search || startDate || endDate ? "Sin resultados" : "¡Todo al día!"}
             </h3>
             <p className="text-neutral-500 text-center text-sm">
-              {search ? "No se encontraron clientes con ese nombre" : "No hay deudas pendientes"}
+              {search || startDate || endDate ? "No se encontraron registros con esos filtros" : "No hay deudas pendientes"}
             </p>
           </div>
         ) : (
